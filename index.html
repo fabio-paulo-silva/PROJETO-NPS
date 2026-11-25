@@ -642,7 +642,9 @@ let SCRIPT = ls.get('nps_ativ_script', DEF_SCRIPT);
 const primeiroNome = (n) => { const p = String(n||'').trim().split(/\s+/)[0] || ''; return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase(); };
 const fDBR = (iso) => iso ? iso.slice(8,10)+'/'+iso.slice(5,7) : '';
 const msg = (r) => SCRIPT.replace(/\{nome\}/g, primeiroNome(r.nome)).replace(/\{loja\}/g, lojaNome(r.pdv)).replace(/\{itens\}/g, r.itens).replace(/\{data\}/g, fDBR(r.data)).replace(/\{pedido\}/g, r.ped);
-const link = (r) => `https://web.whatsapp.com/send?phone=${r.fone}&text=${encodeURIComponent(msg(r))}`;
+// celular (inclui iPad): link universal wa.me, que abre direto no aplicativo; computador: WhatsApp Web
+const MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+const link = (r) => (MOBILE ? `https://wa.me/${r.fone}?text=` : `https://web.whatsapp.com/send?phone=${r.fone}&text=`) + encodeURIComponent(msg(r));
 const fmtFone = (f) => f ? `(${f.slice(2,4)}) ${f.slice(4,9)}-${f.slice(9)}` : '';
 const diasDesde = (iso) => Math.round((new Date(D.corte + 'T12:00:00') - new Date(iso + 'T12:00:00')) / 864e5);
 
@@ -791,7 +793,7 @@ function renderAtiv(){
             : ac.est === 'antes' ? `<span class="muted">Já tinha respondido antes (${fD(ac.rr.dia)}, nota ${ac.rr.nota})</span>`
             : `<span class="st-pend">● Ainda não respondeu</span>`) + quem
           : r.dia ? `<span class="st-ok">✓ Respondeu ${fD(r.dia)}</span> <span class="muted">nota ${r.nota}</span>` : `<span class="st-pend">● Pendente</span>${quem}${obs}`;
-        const wa = r.fone && !r.dia ? `<a class="wa${c?' feito':''}" href="${link(r)}" target="whatsapp" rel="noopener" data-p="${esc(r.ped)}" data-l="${esc(r.pdv)}"><i data-lucide="message-circle"></i>${c?'Enviar de novo':'WhatsApp'}</a>` : '';
+        const wa = r.fone && !r.dia ? `<a class="wa${c?' feito':''}" href="${link(r)}" target="${MOBILE ? '_blank' : 'whatsapp'}" rel="noopener" data-p="${esc(r.ped)}" data-l="${esc(r.pdv)}"><i data-lucide="message-circle"></i>${c?'Enviar de novo':'WhatsApp'}</a>` : '';
         const mk = !r.dia && !c ? ` <button class="btn ghost sm" type="button" data-mk="${esc(r.ped)}" data-l="${esc(r.pdv)}" title="Marcar como já contatado, sem abrir o WhatsApp">Marcar acionado</button>` : '';
         const un = c ? ` <button class="btn ghost sm" type="button" data-un="${esc(r.ped)}" data-l="${esc(r.pdv)}">Desmarcar</button>` : '';
         return `<tr><td class="nm"><b>${esc(r.nome)}</b></td><td>${esc(lojaNome(r.pdv))}</td><td class="tnum">${esc(r.ped)}</td><td>${fD(r.data)}</td><td class="n">${r.itens}</td>
