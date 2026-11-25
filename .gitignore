@@ -1,0 +1,15 @@
+# Planilhas brutas e arquivos de trabalho: ficam só no computador (OneDrive), não vão para o GitHub
+Base_Pedidos_Clique&Retire/
+base_nps/
+dCentros/
+plataforma/
+*.xlsx
+~$*
+*.tmp
+__pycache__/
+*.pyc
+desktop.ini
+
+# Senhas da ativação e configuração local do Claude
+senhas_ativacao.json
+.claude/

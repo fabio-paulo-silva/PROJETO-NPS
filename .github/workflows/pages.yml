@@ -1,0 +1,53 @@
+name: Publicar no GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Montar o site
+        run: |
+          mkdir -p _site
+          cp index.html dados.js ativacao_cripto.js planilha.js _site/
+          touch _site/.nojekyll
+      # Planilha compartilhada dos acionamentos (opcional). Sem os segredos o site sai com os contatos só no navegador.
+      - name: Configurar a planilha (segredos, opcional)
+        env:
+          PLANILHA_URL: ${{ secrets.NPS_PLANILHA_URL || vars.NPS_PLANILHA_URL }}
+          PLANILHA_CHAVE: ${{ secrets.NPS_PLANILHA_CHAVE || vars.NPS_PLANILHA_CHAVE }}
+        run: |
+          if [ -z "$PLANILHA_URL" ] || [ -z "$PLANILHA_CHAVE" ]; then
+            echo "Sem segredos da planilha: contatos ficam só no navegador."
+            exit 0
+          fi
+          python3 - <<'PY'
+          import os, pathlib
+          p = pathlib.Path("_site/planilha.js")
+          t = p.read_text(encoding="utf-8")
+          t = t.replace("__NPS_PLANILHA_URL__", os.environ["PLANILHA_URL"]).replace("__NPS_PLANILHA_CHAVE__", os.environ["PLANILHA_CHAVE"])
+          p.write_text(t, encoding="utf-8")
+          print("configurado:", p)
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
