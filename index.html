@@ -635,7 +635,7 @@ async function desbloquear(pr, senha, lembrar){
 }
 
 // mensagem
-const DEF_SCRIPT = 'Olá, {nome}! Tudo bem? 😊\nAqui é da loja O Boticário {loja}. Vimos que você retirou sua compra de {itens} item(ns) no Clique e Retire em {data}.\nVocê gostou do que levou? Sua opinião é muito importante e leva menos de 1 minuto: responda a pesquisa de satisfação que enviamos para o seu e-mail. Obrigado! 💚';
+const DEF_SCRIPT = 'Oi, {nome}! Tudo bem? 😊\nAqui é do Boticário {loja}. Passando para saber: você gostou dos itens que retirou com a gente? 💚\nSua opinião ajuda a gente a cuidar cada vez melhor de você. Se puder responder a pesquisa que enviamos no seu e-mail, ficamos muito agradecidos!';
 let SCRIPT = ls.get('nps_ativ_script', DEF_SCRIPT);
 const primeiroNome = (n) => { const p = String(n||'').trim().split(/\s+/)[0] || ''; return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase(); };
 const fDBR = (iso) => iso ? iso.slice(8,10)+'/'+iso.slice(5,7) : '';
