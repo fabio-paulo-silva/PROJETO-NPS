@@ -73,14 +73,19 @@ def ler_lojas():
     arq = os.path.join(PASTA, "dCentros", "dCentros_1.xlsx")
     d = pd.read_excel(arq, dtype=str)
     d.columns = [c.strip() for c in d.columns]
-    lojas, pracas = {}, {}
+    lojas, pracas, pessoas = {}, {}, {}
     for _, r in d.iterrows():
+        # gestores do cadastro de lojas: a lista de quem pode se identificar no painel (aba Uso)
+        for papel in ("GVO", "GCVO/GPVO", "GRVO"):
+            nome = str(r.get(papel) or "").strip()
+            if nome and nome.lower() != "nan":
+                pessoas.setdefault(nome, set()).add(papel)
         cod = str(r["BCPS"]).strip().lstrip("0")
         pk = slug(r["PRAÇA"])
         lojas[cod] = {"nome": str(r["LOJA"]).strip().title(), "praca": pk}
         pracas[pk] = {"nome": " ".join(w.upper() if len(w) <= 3 and w.isalpha() and w.lower() not in ("sul", "são") else w.title()
                                        for w in str(r["PRAÇA"]).split())}
-    return lojas, pracas
+    return lojas, pracas, [{"nome": n, "papeis": sorted(p)} for n, p in sorted(pessoas.items())]
 
 
 def fone(v):
@@ -103,7 +108,7 @@ def cat(nota):
 
 def main():
     nps, ped = ler_nps(), ler_pedidos()
-    lojas, pracas = ler_lojas()
+    lojas, pracas, pessoas = ler_lojas()
 
     # --- cruzamento pelo número do pedido (mesma chave nas duas bases) ---
     com_ped = nps[nps["ped"].str.len() >= 8].sort_values("dia_resp").drop_duplicates("ped", keep="first").set_index("ped")
@@ -137,7 +142,7 @@ def main():
     dados = {"gerado": datetime.now().strftime("%d/%m/%Y %H:%M"), "corte": corte,
              "ini": ped["dia"].min(), "fim": ped["dia"].max(),
              "tipo": TIPO_VENDA, "promotor": PROMOTOR, "detrator": DETRATOR,
-             "pracas": pr, "lojas": lj, "base": base, "nps_geral": geral}
+             "pracas": pr, "lojas": lj, "pessoas": pessoas, "base": base, "nps_geral": geral}
     with open(os.path.join(PASTA, "dados.js"), "w", encoding="utf-8") as f:
         f.write("// Gerado por atualizar_dados.py - só contagens, sem nomes nem telefones\nwindow.DADOS = ")
         json.dump(dados, f, ensure_ascii=False, separators=(",", ":"))

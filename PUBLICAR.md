@@ -23,7 +23,19 @@ A cada `push` na `main`, o GitHub Actions (`.github/workflows/pages.yml`) public
    ```
 4. Em 1 a 2 minutos o site atualiza.
 
-Se as marcações de "acionado" precisam ser vistas por toda a equipe, configure a planilha compartilhada abaixo; sem ela, cada pessoa vê só as marcações do próprio navegador.
+Se as marcações de "acionado" precisam ser vistas por toda a equipe e você quer acompanhar os acessos, configure a planilha compartilhada abaixo; sem ela, cada pessoa vê só as marcações do próprio navegador e nada de acessos.
 
-## Planilha compartilhada de acionamentos (opcional)
-Usa o mesmo protocolo do SUPER DESAFIO CSAT: o Apps Script recebe `op: acionamento` e devolve `tipo=acionamentos`. O script atual do PULSAR grava na aba `acionamentos_csat`; para o NPS é preciso uma aba própria (ex.: `acionamentos_nps`) tratando `ciclo = nps-clique-retire`. Depois, em GitHub > Settings > Secrets and variables > Actions, crie os segredos `NPS_PLANILHA_URL` e `NPS_PLANILHA_CHAVE`; a publicação coloca os valores no `planilha.js` do site. Sem os segredos a publicação segue normalmente, com os contatos só no navegador.
+## Planilha compartilhada: acionamentos e acessos (Apps Script)
+Usa a mesma planilha e o mesmo Apps Script do PULSAR/SUPER DESAFIO CSAT, com abas próprias do NPS:
+
+| Aba | O que guarda |
+|---|---|
+| `acionamentos_nps` | cada marcação e desmarcação de contato: quando, praça, loja, número do pedido e quem fez (sem nome nem telefone do cliente) |
+| `acessos_nps` | cada acesso ao painel: quem, quando, tela, praça e loja (no máximo 1 vez a cada 30 min por tela) |
+
+1. Abra o Apps Script da planilha e cole o conteúdo de `apps_script_nps.gs` (fica só no computador). **Mantenha a chave que o script já usa**: troque o texto `COLE-AQUI-A-CHAVE-QUE-O-SCRIPT-JA-USA` pela mesma chave de hoje. Tudo que o PULSAR e o CSAT usam continua igual.
+2. **Implantar > Gerenciar implantações > editar > Nova versão** (Executar como: Eu; Acesso: Qualquer pessoa). A URL continua a mesma.
+3. No GitHub (repositório PROJETO-NPS) > **Settings > Secrets and variables > Actions**, crie `NPS_PLANILHA_URL` (a mesma URL do Apps Script, que termina em `/exec`) e `NPS_PLANILHA_CHAVE` (a mesma chave do script).
+4. Rode de novo a publicação (Actions > Publicar no GitHub Pages > Run workflow, ou um novo `git push`).
+
+Com a planilha ligada, o painel pede o nome de quem acessa (lista dos gestores do cadastro de lojas ou "Outro nome"), mostra o chip "Planilha conectada" na Ativação e a aba **Uso** passa a listar quem acessou e quem marcou ou desmarcou contatos. Acessos feitos no computador local (localhost) não são gravados.

@@ -13,3 +13,4 @@ desktop.ini
 # Senhas da ativação e configuração local do Claude
 senhas_ativacao.json
 .claude/
+apps_script_nps.gs

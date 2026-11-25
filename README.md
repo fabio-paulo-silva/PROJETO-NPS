@@ -6,7 +6,8 @@ Feito no mesmo padrão do SUPER DESAFIO CSAT (site estático no GitHub Pages, da
 
 ## Abas
 - **Visão geral:** pedidos, taxa de resposta, pendentes e NPS por loja e por semana da compra. Só contagens, sem nomes nem telefones.
-- **Ativação:** lista de clientes que ainda não responderam, com botão de WhatsApp e mensagem editável. Nomes e telefones ficam **protegidos por senha** (uma por praça e uma geral).
+- **Ativação:** lista de clientes que ainda não responderam, com botão de WhatsApp, mensagem editável, marcação manual de contato e a visão **Acionados**, que mostra se quem foi contatado respondeu depois. Nomes e telefones ficam **protegidos por senha** (uma por praça e uma geral).
+- **Uso:** quem acessou o painel e quem marcou ou desmarcou contatos (precisa da planilha compartilhada; ver PUBLICAR.md).
 
 ## Como o cruzamento funciona
 O número do pedido é a chave: `PEDIDO` da base de pedidos (sem o sufixo `BOT`) = `Código do pedido` do NPS. CPF não serve (no e-commerce o código do consumidor no NPS é outro ID). Quem tem resposta no NPS para o pedido já respondeu; o restante é pendente.
@@ -19,9 +20,11 @@ O número do pedido é a chave: `PEDIDO` da base de pedidos (sem o sufixo `BOT`)
 | `ativacao_cripto.js` | Dados nominais **criptografados** (AES-GCM + PBKDF2) por praça |
 | `atualizar_dados.py` | Lê as bases em `Base_Pedidos_Clique&Retire/` e `base_nps/` e gera os dois arquivos acima; configuração no topo |
 | `cripto_ativacao.py` | Criptografia dos dados nominais |
-| `planilha.js` | Planilha compartilhada de acionamentos (opcional; ver PUBLICAR.md) |
+| `planilha.js` | Endereço e chave da planilha compartilhada (opcional; trocados na publicação pelos segredos) |
+| `uso.js` | Identificação de quem acessa e registro de acessos (só roda com a planilha ligada) |
+| `apps_script_nps.gs` | Apps Script com as abas do NPS (só no computador; cole no Apps Script do PULSAR) |
 
-Ficam só no computador, fora do GitHub: `Base_Pedidos_Clique&Retire/`, `base_nps/`, `dCentros/` e `senhas_ativacao.json`.
+Ficam só no computador, fora do GitHub: `Base_Pedidos_Clique&Retire/`, `base_nps/`, `dCentros/` e `senhas_ativacao.json` e `apps_script_nps.gs`.
 
 ## Limites conhecidos
 - A mensagem cita a **quantidade** de itens; a base de pedidos não traz o nome dos produtos. Com uma base item a item dá para citar os produtos.

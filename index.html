@@ -508,6 +508,7 @@ details.card>summary{margin:0}
 
 <script src="dados.js"></script>
 <script src="planilha.js" onerror="window.NPS_PLANILHA=null"></script>
+<script src="uso.js" onerror="window.NpsUso=null"></script>
 <script src="ativacao_cripto.js" onerror="window.ATIV_CRIPTO=null"></script>
 <script>
 (function(){
@@ -549,7 +550,8 @@ function tabs(){
   const cnt = ativDados() ? '' : '<i data-lucide="lock" style="width:14px;height:14px"></i>';
   return `<section class="card vtabs"><div class="in">
     <button class="tab${S.view==='geral'?' on':''}" data-view="geral" type="button"><i data-lucide="layout-dashboard"></i>Visão geral</button>
-    <button class="tab${S.view==='ativ'?' on':''}" data-view="ativ" type="button"><i data-lucide="megaphone"></i>Ativação ${cnt}</button></div></section>`;
+    <button class="tab${S.view==='ativ'?' on':''}" data-view="ativ" type="button"><i data-lucide="megaphone"></i>Ativação ${cnt}</button>
+    <button class="tab${S.view==='uso'?' on':''}" data-view="uso" type="button"><i data-lucide="activity"></i>Uso</button></div></section>`;
 }
 
 // ---------------------------------------------------------------- Visão geral
@@ -655,42 +657,43 @@ function recalc(){
   const evs = EVT.concat(FILA).sort((a,b) => (a.quando||'') < (b.quando||'') ? -1 : (a.quando||'') > (b.quando||'') ? 1 : 0);
   const vistos = new Set(), c = {};
   for (const e of evs){ if (vistos.has(e.id)) continue; vistos.add(e.id);
-    const k = String(e.revendedor);
+    const k = String(e.pedido || e.revendedor);
     if (e.acao === 'desmarcar') { delete c[k]; continue; }
     c[k] = c[k] ? { u:e.quando, n:c[k].n + 1, a:e.autor || c[k].a } : { u:e.quando, n:1, a:e.autor || '' }; }
   CONT = c;
 }
 recalc();
 function pedirAutor(){
+  try { const u = window.NpsUso && NpsUso.usuario(); if (u && u.nome) { AUTOR = u.nome; lsA.set('nps_ativ_autor', AUTOR); } } catch(e) {}
   if (AUTOR || !PL) return true;
   const n = (prompt('Seu nome (aparece para a equipe como quem enviou a mensagem):') || '').trim();
   if (!n) return false; AUTOR = n.slice(0, 60); lsA.set('nps_ativ_autor', AUTOR); return true;
 }
 function registrar(ped, pdv, acao){
   if (!pedirAutor()) return false;
-  FILA.push({ id: novoId(), quando: agoraISO(), ciclo: 'nps-clique-retire', praca: S.praca, er: String(pdv), revendedor: String(ped), autor: AUTOR, origem: 'caixa', acao });
+  FILA.push({ id: novoId(), quando: agoraISO(), praca: S.praca, loja: String(pdv), pedido: String(ped), autor: AUTOR, origem: 'caixa', acao });
   lsA.set('nps_ativ_fila', FILA); recalc(); enviarFila(); return true;
 }
 const postPL = (corpo) => fetch(PL.url, { method:'POST', body: JSON.stringify(Object.assign({ chave: PL.chave }, corpo)) }).then((r)=>r.json());
 let _env = false;
 async function enviarFila(){
   if (!PL || _env || !FILA.length) return; _env = true;
-  try { while (FILA.length){ let j; try { j = await postPL({ op:'acionamento', acionamento: FILA[0] }); } catch(e) { SYNC.estado = 'offline'; break; }
+  try { while (FILA.length){ let j; try { j = await postPL({ op:'acionamento_nps', acionamento: FILA[0] }); } catch(e) { SYNC.estado = 'offline'; break; }
       if (!j.ok) { SYNC.estado = 'script'; break; }
       EVT.push(FILA.shift()); lsA.set('nps_ativ_fila', FILA); lsA.set('nps_ativ_eventos', EVT); SYNC.estado = 'ok'; } }
   finally { _env = false; }
 }
 async function carregarContatos(){
   if (!PL) return;
-  try { const j = await fetch(`${PL.url}?chave=${encodeURIComponent(PL.chave)}&tipo=acionamentos&ciclo=nps-clique-retire`, { cache:'no-store' }).then((r)=>r.json());
+  try { const j = await fetch(`${PL.url}?chave=${encodeURIComponent(PL.chave)}&tipo=acionamentos_nps`, { cache:'no-store' }).then((r)=>r.json());
     if (!j.ok || !Array.isArray(j.acionamentos)) SYNC.estado = 'script';
     else { const daFila = new Set(FILA.map((e)=>e.id)); EVT = j.acionamentos.filter((e)=>!daFila.has(e.id)); lsA.set('nps_ativ_eventos', EVT); SYNC.estado = 'ok'; SYNC.quando = agoraISO(); }
   } catch(e) { SYNC.estado = 'offline'; }
-  recalc(); await enviarFila(); if (S.view === 'ativ' && ativDados()) { render(); }
+  recalc(); await enviarFila(); if ((S.view === 'ativ' && ativDados()) || S.view === 'uso') { render(); }
 }
 if (PL) { setTimeout(carregarContatos, 400); setInterval(() => { if (S.view === 'ativ' && !document.hidden) carregarContatos(); }, 180000); }
 const syncChip = () => { const e = SYNC.estado, n = FILA.length;
-  const [cls, txt] = !PL ? ['flat','Só neste navegador'] : e==='ok' && !n ? ['up','Planilha conectada'] : e==='offline' ? ['mid',`Sem conexão${n?' · '+n+' para enviar':''}`] : e==='script' ? ['mid','Apps Script sem a aba do NPS'] : ['flat','Conectando…'];
+  const [cls, txt] = !PL ? ['flat','Só neste navegador'] : e==='ok' && !n ? ['up','Planilha conectada'] : e==='offline' ? ['mid',`Sem conexão${n?' · '+n+' para enviar':''}`] : e==='script' ? ['mid','Atualize o Apps Script (versão do NPS)'] : ['flat','Conectando…'];
   return `<span class="delta ${cls}" title="Marcações de contato compartilhadas pela equipe"><i data-lucide="sheet"></i>${esc(txt)}</span>`; };
 
 function renderAtiv(){
@@ -819,7 +822,59 @@ function renderAtiv(){
 }
 
 function bindComum(){ document.querySelectorAll('[data-view]').forEach((b) => b.onclick = () => { S.view = b.dataset.view; S.pag = 0; render(); }); }
-function render(){ salvar(); if (S.view === 'ativ') renderAtiv(); else renderGeral(); icons(); }
+// ---------------------------------------------------------------- Uso: quem acessou e quem acionou (planilha compartilhada)
+let USO = { mes:null, dados:null, em:0, erro:'' };
+const mesAtual = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+async function carregarUso(force){
+  const mes = mesAtual();
+  if (!force && USO.mes === mes && USO.dados && Date.now() - USO.em < 120000) return;
+  if (!window.NpsUso || !PL) { USO = { mes, dados:null, em:Date.now(), erro:'uso' }; return; }
+  try { const a = await NpsUso.acessos(mes); USO = { mes, dados: a ? a.filter((x) => String(x.pagina||'').startsWith('nps')) : null, em:Date.now(), erro: a ? '' : 'script' }; }
+  catch(e) { USO = { mes, dados:null, em:Date.now(), erro:'rede' }; }
+}
+function registrarUso(){
+  try { if (window.NpsUso && PL) NpsUso.registrar({ pagina:'nps', aba:S.view + (S.view === 'ativ' ? ' · ' + S.status : ''), praca:S.praca, loja_id:S.loja }); } catch(e) {}
+}
+const rotulaAba = (a) => ({ geral:'Visão geral', ativ:'Ativação', uso:'Uso' }[String(a).split(' · ')[0]] || a);
+function renderUso(){
+  const aviso = (t) => `${tabs()}<section class="card aviso"><span class="icchip t-warning"><i data-lucide="activity"></i></span><div><h2>Uso do painel</h2><p class="sub" style="margin-top:6px">${t}</p></div></section>`;
+  if (!PL) { $('app').innerHTML = aviso('A planilha compartilhada ainda não está configurada neste site (segredos <code>NPS_PLANILHA_URL</code> e <code>NPS_PLANILHA_CHAVE</code>), então acessos e acionamentos não são registrados.'); bindComum(); return; }
+  if (!USO.dados && !USO.erro) { $('app').innerHTML = aviso('Carregando os acessos…'); bindComum(); carregarUso().then(() => { if (S.view === 'uso') render(); }); return; }
+  if (USO.erro) { $('app').innerHTML = aviso(`${USO.erro === 'script' ? 'O Apps Script ainda não é a versão com o NPS. Cole a versão nova (arquivo <code>apps_script_nps.gs</code>) e publique uma nova versão da implantação.' : 'Não foi possível ler a planilha agora.'} <button class="btn sm" type="button" id="usoTentar">Tentar de novo</button>`);
+    bindComum(); $('usoTentar').onclick = () => { USO.dados = null; USO.erro = ''; render(); }; return; }
+  const ac = USO.dados, mes = USO.mes;
+  const porNome = {}; ac.forEach((x) => { const o = porNome[x.nome] || (porNome[x.nome] = { nome:x.nome, papel:x.papel, n:0, ult:'', telas:new Set() }); o.n++; if (x.quando > o.ult) o.ult = x.quando; o.telas.add(rotulaAba(x.aba)); });
+  const pessoas = Object.values(porNome).sort((a,b) => b.n - a.n);
+  const dias = new Set(ac.map((x) => String(x.quando).slice(0,10))).size;
+  // acionamentos: o que cada pessoa marcou e desmarcou (eventos da planilha + fila local ainda não enviada)
+  const evs = EVT.concat(FILA.filter((f) => !EVT.some((e) => e.id === f.id)));
+  const porAutor = {}; evs.forEach((e) => { const k = e.autor || '(sem nome)'; const o = porAutor[k] || (porAutor[k] = { nome:k, m:0, d:0, ult:'' }); if (e.acao === 'desmarcar') o.d++; else o.m++; if ((e.quando||'') > o.ult) o.ult = e.quando; });
+  const autores = Object.values(porAutor).sort((a,b) => b.m - a.m);
+  const ultimos = evs.slice().sort((a,b) => (a.quando||'') < (b.quando||'') ? 1 : -1).slice(0, 30);
+  const fQ = (q) => q ? `${String(q).slice(8,10)}/${String(q).slice(5,7)} ${String(q).slice(11,16)}` : '—';
+  $('app').innerHTML = `${tabs()}
+  <section class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+    ${kpi('Acessos no mês', fI(ac.length), 'activity', 't-accent', `<span>${esc(mes)} · ${fI(dias)} dias com acesso</span>`)}
+    ${kpi('Pessoas', fI(pessoas.length), 'users', 't-primary', `<span>identificadas no mês</span>`)}
+    ${kpi('Contatos marcados', fI(evs.filter((e) => e.acao !== 'desmarcar').length), 'message-circle', 't-warning', `<span>${fI(evs.filter((e) => e.acao === 'desmarcar').length)} desmarcados · todo o período</span>`)}
+  </section>
+  <section class="card"><div class="card-hd"><div class="hl"><span class="icchip t-accent"><i data-lucide="users"></i></span><div><h2>Quem acessou</h2><p>Acessos ao painel em ${esc(mes)}</p></div></div><button class="btn ghost sm" type="button" id="usoAtualizar"><i data-lucide="refresh-ccw"></i>Atualizar</button></div>
+    <div class="tw"><table><thead><tr><th>Pessoa</th><th>Função</th><th class="n">Acessos</th><th>Último acesso</th><th>Telas</th></tr></thead><tbody>${
+      pessoas.map((o) => `<tr><td><b>${esc(o.nome)}</b></td><td>${esc(o.papel)}</td><td class="n">${fI(o.n)}</td><td>${fQ(o.ult)}</td><td>${esc([...o.telas].join(', '))}</td></tr>`).join('') || '<tr><td colspan="5" class="sub">Nenhum acesso registrado neste mês.</td></tr>'}</tbody></table></div></section>
+  <section class="card"><div class="card-hd"><div class="hl"><span class="icchip t-warning"><i data-lucide="message-circle"></i></span><div><h2>Quem acionou</h2><p>Marcações e desmarcações de contato por pessoa</p></div></div></div>
+    <div class="tw"><table><thead><tr><th>Pessoa</th><th class="n">Marcados</th><th class="n">Desmarcados</th><th>Última marcação</th></tr></thead><tbody>${
+      autores.map((o) => `<tr><td><b>${esc(o.nome)}</b></td><td class="n">${fI(o.m)}</td><td class="n">${fI(o.d)}</td><td>${fQ(o.ult)}</td></tr>`).join('') || '<tr><td colspan="4" class="sub">Nenhuma marcação ainda.</td></tr>'}</tbody></table></div></section>
+  <details class="card"><summary>Últimos ${ultimos.length} acionamentos</summary><div class="tw" style="margin-top:8px"><table><thead><tr><th>Quando</th><th>Pessoa</th><th>Ação</th><th>Loja</th><th>Pedido</th></tr></thead><tbody>${
+      ultimos.map((e) => `<tr><td>${fQ(e.quando)}</td><td>${esc(e.autor || '—')}</td><td>${e.acao === 'desmarcar' ? '<span class="muted">desmarcou</span>' : '<span class="st-ok">marcou</span>'}</td><td>${esc(lojaNome(e.loja || e.er))}</td><td class="tnum">${esc(e.pedido || e.revendedor)}</td></tr>`).join('')}</tbody></table></div></details>
+  <p class="foot">Acessos registrados no máximo 1 vez a cada 30 minutos por tela, e nunca a partir do computador local. Acionamentos guardam só o número do pedido e a loja, sem nome nem telefone do cliente.</p>`;
+  bindComum(); const b = $('usoAtualizar'); if (b) b.onclick = () => { carregarUso(true).then(() => carregarContatos()).then(() => render()); };
+}
+
+function render(){ salvar(); if (S.view === 'ativ') renderAtiv(); else if (S.view === 'uso') renderUso(); else renderGeral(); icons(); registrarUso(); }
+if (window.NpsUso && PL) {
+  NpsUso.aoTrocar = (u) => { if (u && u.nome) { AUTOR = u.nome; lsA.set('nps_ativ_autor', AUTOR); } registrarUso(); };
+  NpsUso.iniciar({ pessoas: D.pessoas || [], planilha: PL, ambiente: 'nps', pagina: 'nps' }).then(registrarUso);
+}
 render();
 })();
 </script>
