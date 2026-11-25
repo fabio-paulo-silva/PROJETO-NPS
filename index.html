@@ -642,9 +642,10 @@ let SCRIPT = ls.get('nps_ativ_script', DEF_SCRIPT);
 const primeiroNome = (n) => { const p = String(n||'').trim().split(/\s+/)[0] || ''; return p.charAt(0).toUpperCase() + p.slice(1).toLowerCase(); };
 const fDBR = (iso) => iso ? iso.slice(8,10)+'/'+iso.slice(5,7) : '';
 const msg = (r) => SCRIPT.replace(/\{nome\}/g, primeiroNome(r.nome)).replace(/\{loja\}/g, lojaNome(r.pdv)).replace(/\{itens\}/g, r.itens).replace(/\{data\}/g, fDBR(r.data)).replace(/\{pedido\}/g, r.ped);
-// link universal wa.me (celular e computador): no celular abre direto no aplicativo; no computador oferece o app ou o WhatsApp Web
+// api.whatsapp.com/send (celular e computador): é a página para onde o wa.me redireciona, acessada direto.
+// O redirecionamento do wa.me troca emojis por "�"; este endereço mantém os emojis da mensagem.
 const MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
-const link = (r) => `https://wa.me/${r.fone}?text=${encodeURIComponent(msg(r))}`;
+const link = (r) => `https://api.whatsapp.com/send?phone=${r.fone}&text=${encodeURIComponent(msg(r))}`;
 const fmtFone = (f) => f ? `(${f.slice(2,4)}) ${f.slice(4,9)}-${f.slice(9)}` : '';
 const diasDesde = (iso) => Math.round((new Date(D.corte + 'T12:00:00') - new Date(iso + 'T12:00:00')) / 864e5);
 
