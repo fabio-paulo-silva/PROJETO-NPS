@@ -15,11 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  # Job 1: monta o site e envia como artefato
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Montar o site
@@ -27,7 +25,7 @@ jobs:
           mkdir -p _site
           cp index.html dados.js ativacao_cripto.js planilha.js uso.js _site/
           touch _site/.nojekyll
-      # Planilha compartilhada dos acionamentos (opcional). Sem os segredos o site sai com os contatos só no navegador.
+      # Planilha compartilhada de acionamentos e acessos (opcional). Sem os segredos o site sai sem ela.
       - name: Configurar a planilha (segredos, opcional)
         env:
           PLANILHA_URL: ${{ secrets.NPS_PLANILHA_URL || vars.NPS_PLANILHA_URL }}
@@ -49,8 +47,14 @@ jobs:
       - uses: actions/upload-pages-artifact@v4
         with:
           path: _site
-      # O deploy às vezes não acha o artefato recém-enviado (erro intermitente do GitHub); uma pausa curta evita isso.
-      - name: Aguardar o artefato ficar disponível
-        run: sleep 20
+
+  # Job 2: só publica o artefato do job 1 (formato oficial; o artefato já está finalizado quando este job começa)
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
