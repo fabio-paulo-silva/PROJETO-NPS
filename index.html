@@ -721,38 +721,52 @@ function renderAtiv(){
   rows.forEach((r) => { if (!r.dia) (cliPeds[r.cli] = cliPeds[r.cli] || []).push(r.ped); });
   const contatado = (r) => (cliPeds[r.cli] || [r.ped]).map((p) => CONT[p]).filter(Boolean).sort((a,b) => a.u < b.u ? 1 : -1)[0] || null;
   const jaResp = (r) => r.outra || cliResp.has(r.cli);
+  // acionados: um por cliente (contato mais recente) e se ele respondeu o NPS depois do contato
+  const porCli = {}; rows.forEach((r) => { (porCli[r.cli] = porCli[r.cli] || []).push(r); });
+  const acionPorPed = {}, acion = [];
+  { const m = {};
+    doLoja.forEach((r) => { const c = CONT[r.ped]; if (c && (!m[r.cli] || c.u > m[r.cli].c.u)) m[r.cli] = { r, c }; });
+    Object.values(m).forEach(({ r, c }) => {
+      const rs = porCli[r.cli].filter((x) => x.dia).sort((a,b) => a.dia < b.dia ? -1 : 1);
+      const dep = rs.find((x) => x.dia >= c.u.slice(0,10));
+      const a = { r, c, est: dep ? 'resp' : rs.length ? 'antes' : 'pend', rr: dep || rs[rs.length - 1] || null };
+      acion.push(a); acionPorPed[r.ped] = a; }); }
+  const nAc = acion.length, nAcResp = acion.filter((a) => a.est === 'resp').length, nAcPend = acion.filter((a) => a.est === 'pend').length, nAcAntes = nAc - nAcResp - nAcPend;
   const pendTodos = doLoja.filter((r) => !r.dia);
   const elegiveis = pendTodos.filter((r) => diasDesde(r.data) >= S.min && (!S.semOutra || !jaResp(r)));
   const vistos = new Set();
   const pendLista = (S.uni ? elegiveis.filter((r) => { if (vistos.has(r.cli)) return false; vistos.add(r.cli); return true; }) : elegiveis);   // rows já vêm da compra mais recente para a mais antiga
   const q = S.q.trim().toLowerCase();
-  const base = S.status === 'pend' ? pendLista : S.status === 'resp' ? doLoja.filter((r) => r.dia) : doLoja;
-  const lst = base.filter((r) => (!S.soFone || r.fone || S.status === 'resp') && (!q || r.nome.toLowerCase().includes(q) || r.ped.includes(q)));
+  const base = S.status === 'pend' ? pendLista : S.status === 'resp' ? doLoja.filter((r) => r.dia) : S.status === 'acion' ? acion.map((a) => a.r) : doLoja;
+  const lst = base.filter((r) => (!S.soFone || r.fone || S.status === 'resp' || S.status === 'acion') && (!q || r.nome.toLowerCase().includes(q) || r.ped.includes(q)));
   const resp = doLoja.filter((r) => r.dia).length;
   const pendCli = new Set(pendTodos.map((r) => r.cli)).size;
   const pendFone = pendLista.filter((r) => r.fone).length, contHoje = pendLista.filter((r) => contatado(r)).length;
   const porLoja = lojas.filter((c) => !S.loja || c === S.loja).map((c) => { const rs = rows.filter((r) => r.pdv === c); const rr = rs.filter((r)=>r.dia).length;
     const pd = rs.filter((r) => !r.dia && diasDesde(r.data) >= S.min); return { c, n: rs.length, rr, pend: new Set(pd.map((r)=>r.cli)).size, fone: new Set(pd.filter((r)=>r.fone).map((r)=>r.cli)).size }; });
   const PG = 50, pags = Math.max(1, Math.ceil(lst.length / PG)); if (S.pag >= pags) S.pag = pags - 1;
-  const ord = lst.slice().sort((a,b) => (!!a.dia - !!b.dia) || (!!contatado(a) - !!contatado(b)) || (a.data < b.data ? 1 : -1));
+  const ORD_AC = { pend: 0, antes: 1, resp: 2 };
+  const ord = S.status === 'acion' ? lst.slice().sort((a,b) => (ORD_AC[acionPorPed[a.ped].est] - ORD_AC[acionPorPed[b.ped].est]) || (acionPorPed[a.ped].c.u < acionPorPed[b.ped].c.u ? 1 : -1))
+    : lst.slice().sort((a,b) => (!!a.dia - !!b.dia) || (!!contatado(a) - !!contatado(b)) || (a.data < b.data ? 1 : -1));
   const pagina = ord.slice(S.pag * PG, S.pag * PG + PG);
 
   $('app').innerHTML = `${tabs()}
   <section class="card filter"><div class="row">
     <div class="fld"><label>Praça</label>${seg('praca', pracasComBase.map((p)=>[p, D.pracas[p].nome]))}</div>
     <div class="fld"><label for="fLoja">Loja</label><select id="fLoja"><option value="">Todas</option>${lojas.map((c)=>`<option value="${c}"${c===S.loja?' selected':''}>${esc(lojaNome(c))}</option>`).join('')}</select></div>
-    <div class="fld"><label>Situação</label>${seg('status', [['pend','Não responderam'],['resp','Responderam'],['todos','Todos']])}</div>
+    <div class="fld"><label>Situação</label>${seg('status', [['pend','Não responderam'],['acion','Acionados'],['resp','Responderam'],['todos','Todos']])}</div>
     <div class="fld"><label for="fMin">Compra há pelo menos</label><select id="fMin">${[0,1,2,3,5,7].map((d)=>`<option value="${d}"${d===+S.min?' selected':''}>${d} ${d===1?'dia':'dias'}</option>`).join('')}</select></div>
     <div class="fld"><label for="fQ">Buscar</label><input type="search" id="fQ" placeholder="Nome ou pedido" value="${esc(S.q)}"></div>
     <label class="chk"><input type="checkbox" id="fFone"${S.soFone?' checked':''}> Só com telefone</label>
     <label class="chk"><input type="checkbox" id="fUni"${S.uni?' checked':''}> Um contato por cliente</label>
     <label class="chk"><input type="checkbox" id="fOutra"${S.semOutra?' checked':''}> Ocultar quem já respondeu outra pesquisa</label>
   </div></section>
-  <section class="kpis" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+  <section class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
     ${kpi('Pedidos', fI(doLoja.length), 'shopping-bag', 't-accent', `<span>${fI(new Set(doLoja.map((r)=>r.cli)).size)} clientes</span>`)}
     ${kpi('Responderam', fI(resp), 'check-check', 't-primary', `<span class="delta ${resp/Math.max(1,doLoja.length)>=0.2?'up':'down'}">${fP(resp/Math.max(1,doLoja.length),1)} dos pedidos</span>`)}
     ${kpi('Para acionar', fI(pendLista.length), 'clock', 't-destructive', `<span>${fI(pendFone)} com telefone · ${fI(pendCli)} clientes pendentes no total</span>`)}
-    ${kpi('Acionados', fI(contHoje), 'message-circle', 't-warning', `<span>de ${fI(pendLista.length)} para acionar ${PL ? '(equipe)' : '(neste navegador)'}</span>`)}
+    ${kpi('Acionados', fI(nAc), 'message-circle', 't-warning', `<span>clientes contatados ${PL ? '(equipe)' : '(neste navegador)'}</span>`)}
+    ${kpi('Responderam após o contato', fI(nAcResp), 'badge-check', 't-primary', `<span class="delta ${nAcResp/Math.max(1,nAc)>=0.2?'up':'flat'}">${fP(nAcResp/Math.max(1,nAc),1)} dos acionados</span><span>${fI(nAcPend)} sem resposta${nAcAntes?` · ${fI(nAcAntes)} já tinham respondido antes`:''}</span>`)}
   </section>
   <section class="card"><div class="card-hd"><div class="hl"><span class="icchip t-accent"><i data-lucide="store"></i></span><div><h2>Por loja</h2><p>Pedidos x respostas · clientes a acionar (compra há ${S.min}+ dias)</p></div></div>${syncChip()}</div>
     <div class="tw"><table><thead><tr><th>Loja</th><th class="n">Pedidos</th><th class="n">Responderam</th><th>Taxa de resposta</th><th class="n">Clientes a acionar</th><th class="n">Com telefone</th></tr></thead><tbody>${
@@ -763,14 +777,24 @@ function renderAtiv(){
     <textarea id="tScript" aria-label="Texto da mensagem">${esc(SCRIPT)}</textarea>
     <div class="ph">Use <code>{nome}</code> primeiro nome · <code>{loja}</code> loja · <code>{itens}</code> quantidade de itens · <code>{data}</code> data da compra · <code>{pedido}</code> número do pedido.</div>
     ${pagina[0] ? `<div class="prev" id="pvw">${esc(msg(pagina[0]))}</div>` : ''}</section>
-  <section class="card"><div class="card-hd"><div class="hl"><span class="icchip t-destructive"><i data-lucide="users"></i></span><div><h2>Clientes</h2><p>${fI(lst.length)} na lista · pendentes ainda não acionados primeiro, compras mais recentes antes</p></div></div></div>
+  <section class="card"><div class="card-hd"><div class="hl"><span class="icchip t-destructive"><i data-lucide="users"></i></span><div><h2>Clientes</h2><p>${fI(lst.length)} na lista · ${S.status === 'acion' ? 'sem resposta primeiro, contatos mais recentes antes' : 'pendentes ainda não acionados primeiro, compras mais recentes antes'}</p></div></div></div>
     <div class="tw"><table class="lst"><thead><tr><th>Cliente</th><th>Loja</th><th>Pedido</th><th>Compra</th><th class="n">Itens</th><th>Situação</th><th>Telefone</th><th></th></tr></thead><tbody>${
-      pagina.map((r)=>{ const c = !r.dia && contatado(r), np = (cliPeds[r.cli]||[]).length;
+      pagina.map((r)=>{ const ac = acionPorPed[r.ped], np = (cliPeds[r.cli]||[]).length;
+        const c = S.status === 'acion' && ac ? ac.c : (!r.dia && contatado(r));
         const obs = !r.dia ? `${np>1?`<span class="chip">${np} pedidos pendentes</span>`:''}${jaResp(r)?'<span class="chip">já respondeu outra pesquisa</span>':''}` : '';
+        const quem = c ? ` <span class="muted">acionado ${fDH(c.u)}${c.a?' por '+esc(c.a):''}</span>` : '';
+        const sit = S.status === 'acion' && ac
+          ? (ac.est === 'resp' ? `<span class="st-ok">✓ Respondeu ${fD(ac.rr.dia)} após o contato</span> <span class="muted">nota ${ac.rr.nota}</span>`
+            : ac.est === 'antes' ? `<span class="muted">Já tinha respondido antes (${fD(ac.rr.dia)}, nota ${ac.rr.nota})</span>`
+            : `<span class="st-pend">● Ainda não respondeu</span>`) + quem
+          : r.dia ? `<span class="st-ok">✓ Respondeu ${fD(r.dia)}</span> <span class="muted">nota ${r.nota}</span>` : `<span class="st-pend">● Pendente</span>${quem}${obs}`;
+        const wa = r.fone && !r.dia ? `<a class="wa${c?' feito':''}" href="${link(r)}" target="whatsapp" rel="noopener" data-p="${esc(r.ped)}" data-l="${esc(r.pdv)}"><i data-lucide="message-circle"></i>${c?'Enviar de novo':'WhatsApp'}</a>` : '';
+        const mk = !r.dia && !c ? ` <button class="btn ghost sm" type="button" data-mk="${esc(r.ped)}" data-l="${esc(r.pdv)}" title="Marcar como já contatado, sem abrir o WhatsApp">Marcar acionado</button>` : '';
+        const un = c ? ` <button class="btn ghost sm" type="button" data-un="${esc(r.ped)}" data-l="${esc(r.pdv)}">Desmarcar</button>` : '';
         return `<tr><td class="nm"><b>${esc(r.nome)}</b></td><td>${esc(lojaNome(r.pdv))}</td><td class="tnum">${esc(r.ped)}</td><td>${fD(r.data)}</td><td class="n">${r.itens}</td>
-        <td>${r.dia ? `<span class="st-ok">✓ Respondeu ${fD(r.dia)}</span> <span class="muted">nota ${r.nota}</span>` : `<span class="st-pend">● Pendente</span>${c?` <span class="muted">acionado ${fDH(c.u)}${c.a?' por '+esc(c.a):''}</span>`:''}${obs}`}</td>
+        <td>${sit}</td>
         <td class="tnum">${r.fone ? fmtFone(r.fone) : '<span class="sem">sem telefone</span>'}</td>
-        <td>${r.fone && !r.dia ? `<a class="wa${c?' feito':''}" href="${link(r)}" target="whatsapp" rel="noopener" data-p="${esc(r.ped)}" data-l="${esc(r.pdv)}"><i data-lucide="message-circle"></i>${c?'Enviar de novo':'WhatsApp'}</a>${c?` <button class="btn ghost sm" type="button" data-un="${esc(r.ped)}" data-l="${esc(r.pdv)}">Desmarcar</button>`:''}` : ''}</td></tr>`; }).join('') || '<tr><td colspan="8" class="sub">Ninguém neste filtro.</td></tr>'}
+        <td>${wa}${mk}${un}</td></tr>`; }).join('') || '<tr><td colspan="8" class="sub">Ninguém neste filtro.</td></tr>'}
     </tbody></table></div>
     <div class="pager">${pags>1?`<button class="btn ghost sm" type="button" id="pAnt"${S.pag===0?' disabled':''}>‹ Anterior</button><span>Página ${S.pag+1} de ${pags}</span><button class="btn ghost sm" type="button" id="pProx"${S.pag>=pags-1?' disabled':''}>Próxima ›</button>`:''}</div></section>
   <p class="foot">${PL ? 'Os contatos são compartilhados pela equipe e atualizam a cada 3 minutos.' : 'Os contatos ficam salvos só neste navegador (sem planilha compartilhada configurada).'} Dados gerados em ${esc(A.gerado)}; respostas até ${fD(A.corte)}. Contém dados pessoais: não compartilhe a senha nem prints.</p>`;
@@ -787,7 +811,8 @@ function renderAtiv(){
     document.querySelectorAll('a.wa').forEach((a) => { const r = rows.find((x) => x.ped === a.dataset.p); if (r) a.href = link(r); }); };
   $('bPadrao').onclick = () => { SCRIPT = DEF_SCRIPT; ls.set('nps_ativ_script', SCRIPT); render(); };
   document.querySelectorAll('a.wa').forEach((a) => a.addEventListener('click', () => { if (registrar(a.dataset.p, a.dataset.l, 'marcar')) setTimeout(() => { render(); toast('Marcado como acionado'); }, 300); }));
-  document.querySelectorAll('[data-un]').forEach((b) => b.onclick = () => { const r = rows.find((x) => x.ped === b.dataset.un); (cliPeds[r.cli] || [r.ped]).filter((p) => CONT[p]).forEach((p) => registrar(p, b.dataset.l, 'desmarcar')); render(); });
+  document.querySelectorAll('[data-mk]').forEach((b) => b.onclick = () => { if (registrar(b.dataset.mk, b.dataset.l, 'marcar')) { render(); toast('Marcado como acionado'); } });
+  document.querySelectorAll('[data-un]').forEach((b) => b.onclick = () => { const r = rows.find((x) => x.ped === b.dataset.un); (porCli[r.cli] || [r]).map((x) => x.ped).filter((p) => CONT[p]).forEach((p) => registrar(p, b.dataset.l, 'desmarcar')); render(); });
   const pa = $('pAnt'), pp = $('pProx');
   if (pa) pa.onclick = () => { S.pag--; render(); window.scrollTo({ top: $('app').offsetTop, behavior:'smooth' }); };
   if (pp) pp.onclick = () => { S.pag++; render(); window.scrollTo({ top: $('app').offsetTop, behavior:'smooth' }); };
