@@ -749,7 +749,11 @@ function renderAtiv(){
   const pendCli = new Set(pendTodos.map((r) => r.cli)).size;
   const pendFone = pendLista.filter((r) => r.fone).length, contHoje = pendLista.filter((r) => contatado(r)).length;
   const porLoja = lojas.filter((c) => !S.loja || c === S.loja).map((c) => { const rs = rows.filter((r) => r.pdv === c); const rr = rs.filter((r)=>r.dia).length;
-    const pd = rs.filter((r) => !r.dia && diasDesde(r.data) >= S.min); return { c, n: rs.length, rr, pend: new Set(pd.map((r)=>r.cli)).size, fone: new Set(pd.filter((r)=>r.fone).map((r)=>r.cli)).size }; });
+    const pd = rs.filter((r) => !r.dia && diasDesde(r.data) >= S.min); const ac = acion.filter((a) => a.r.pdv === c);
+    return { c, n: rs.length, rr, pend: new Set(pd.map((r)=>r.cli)).size, fone: new Set(pd.filter((r)=>r.fone).map((r)=>r.cli)).size, ac: ac.length, acR: ac.filter((a) => a.est === 'resp').length }; });
+  // por quem acionou: quantos clientes cada pessoa contatou e quantos responderam depois
+  const porAutor = Object.values(acion.reduce((m, a) => { const k = a.c.a || '(sem nome)', o = m[k] || (m[k] = { nome:k, n:0, resp:0, pend:0, ult:'' });
+    o.n++; if (a.est === 'resp') o.resp++; if (a.est === 'pend') o.pend++; if (a.c.u > o.ult) o.ult = a.c.u; return m; }, {})).sort((a,b) => b.n - a.n);
   const PG = 50, pags = Math.max(1, Math.ceil(lst.length / PG)); if (S.pag >= pags) S.pag = pags - 1;
   const ORD_AC = { pend: 0, antes: 1, resp: 2 };
   const ord = S.status === 'acion' ? lst.slice().sort((a,b) => (ORD_AC[acionPorPed[a.ped].est] - ORD_AC[acionPorPed[b.ped].est]) || (acionPorPed[a.ped].c.u < acionPorPed[b.ped].c.u ? 1 : -1))
@@ -775,9 +779,13 @@ function renderAtiv(){
     ${kpi('Responderam após o contato', fI(nAcResp), 'badge-check', 't-primary', `<span class="delta ${nAcResp/Math.max(1,nAc)>=0.2?'up':'flat'}">${fP(nAcResp/Math.max(1,nAc),1)} dos acionados</span><span>${fI(nAcPend)} sem resposta${nAcAntes?` · ${fI(nAcAntes)} já tinham respondido antes`:''}</span>`)}
   </section>
   <section class="card"><div class="card-hd"><div class="hl"><span class="icchip t-accent"><i data-lucide="store"></i></span><div><h2>Por loja</h2><p>Pedidos x respostas · clientes a acionar (compra há ${S.min}+ dias)</p></div></div>${syncChip()}</div>
-    <div class="tw"><table><thead><tr><th>Loja</th><th class="n">Pedidos</th><th class="n">Responderam</th><th>Taxa de resposta</th><th class="n">Clientes a acionar</th><th class="n">Com telefone</th></tr></thead><tbody>${
-      porLoja.map((o)=>`<tr><td><b>${esc(lojaNome(o.c))}</b></td><td class="n">${fI(o.n)}</td><td class="n">${fI(o.rr)}</td><td><div class="minib">${bar(o.rr/Math.max(1,o.n), .3, .1)}<b>${fP(o.rr/Math.max(1,o.n),1)}</b></div></td><td class="n">${fI(o.pend)}</td><td class="n">${fI(o.fone)}</td></tr>`).join('')}
+    <div class="tw"><table><thead><tr><th>Loja</th><th class="n">Pedidos</th><th class="n">Responderam</th><th>Taxa de resposta</th><th class="n">Clientes a acionar</th><th class="n">Com telefone</th><th class="n">Acionados</th><th class="n">Responderam após o contato</th></tr></thead><tbody>${
+      porLoja.map((o)=>`<tr><td><b>${esc(lojaNome(o.c))}</b></td><td class="n">${fI(o.n)}</td><td class="n">${fI(o.rr)}</td><td><div class="minib">${bar(o.rr/Math.max(1,o.n), .3, .1)}<b>${fP(o.rr/Math.max(1,o.n),1)}</b></div></td><td class="n">${fI(o.pend)}</td><td class="n">${fI(o.fone)}</td><td class="n">${fI(o.ac)}</td><td class="n">${fI(o.acR)}${o.ac ? ` <span class="muted">(${fP(o.acR/o.ac,0)})</span>` : ''}</td></tr>`).join('')}
     </tbody></table></div></section>
+  ${porAutor.length ? `<section class="card"><div class="card-hd"><div class="hl"><span class="icchip t-warning"><i data-lucide="message-circle"></i></span><div><h2>Quem acionou e quem respondeu</h2><p>Clientes contatados por pessoa e quantos responderam o NPS depois do contato · use a situação “Acionados” para ver a lista nominal</p></div></div></div>
+    <div class="tw"><table><thead><tr><th>Quem acionou</th><th class="n">Clientes acionados</th><th class="n">Responderam após o contato</th><th class="n">Ainda sem resposta</th><th>Último contato</th></tr></thead><tbody>${
+      porAutor.map((o)=>`<tr><td><b>${esc(o.nome)}</b></td><td class="n">${fI(o.n)}</td><td class="n">${fI(o.resp)} <span class="muted">(${fP(o.resp/Math.max(1,o.n),0)})</span></td><td class="n">${fI(o.pend)}</td><td>${fDH(o.ult)}</td></tr>`).join('')}
+    </tbody></table></div></section>` : ''}
   <section class="card scr"><div class="card-hd"><div class="hl"><span class="icchip t-primary"><i data-lucide="message-square-text"></i></span><div><h2>Mensagem do WhatsApp</h2><p>Editável; fica salva neste navegador</p></div></div>
     <button class="btn ghost sm" type="button" id="bPadrao"><i data-lucide="rotate-ccw"></i>Texto padrão</button></div>
     <textarea id="tScript" aria-label="Texto da mensagem">${esc(SCRIPT)}</textarea>
