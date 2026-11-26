@@ -755,7 +755,7 @@ function renderAtiv(){
   const porAutor = Object.values(acion.reduce((m, a) => { const k = a.c.a || '(sem nome)', o = m[k] || (m[k] = { nome:k, n:0, resp:0, pend:0, ult:'' });
     o.n++; if (a.est === 'resp') o.resp++; if (a.est === 'pend') o.pend++; if (a.c.u > o.ult) o.ult = a.c.u; return m; }, {})).sort((a,b) => b.n - a.n);
   const PG = 50, pags = Math.max(1, Math.ceil(lst.length / PG)); if (S.pag >= pags) S.pag = pags - 1;
-  const ORD_AC = { pend: 0, antes: 1, resp: 2 };
+  const ORD_AC = { resp: 0, pend: 1, antes: 2 };   // acionados: primeiro quem respondeu após o contato
   const ord = S.status === 'acion' ? lst.slice().sort((a,b) => (ORD_AC[acionPorPed[a.ped].est] - ORD_AC[acionPorPed[b.ped].est]) || (acionPorPed[a.ped].c.u < acionPorPed[b.ped].c.u ? 1 : -1))
     : lst.slice().sort((a,b) => (!!a.dia - !!b.dia) || (!!contatado(a) - !!contatado(b)) || (a.data < b.data ? 1 : -1));
   const pagina = ord.slice(S.pag * PG, S.pag * PG + PG);
@@ -791,7 +791,7 @@ function renderAtiv(){
     <textarea id="tScript" aria-label="Texto da mensagem">${esc(SCRIPT)}</textarea>
     <div class="ph">Use <code>{nome}</code> primeiro nome · <code>{loja}</code> loja · <code>{itens}</code> quantidade de itens · <code>{data}</code> data da compra · <code>{pedido}</code> número do pedido.</div>
     ${pagina[0] ? `<div class="prev" id="pvw">${esc(msg(pagina[0]))}</div>` : ''}</section>
-  <section class="card"><div class="card-hd"><div class="hl"><span class="icchip t-destructive"><i data-lucide="users"></i></span><div><h2>Clientes</h2><p>${fI(lst.length)} na lista · ${S.status === 'acion' ? 'sem resposta primeiro, contatos mais recentes antes' : 'pendentes ainda não acionados primeiro, compras mais recentes antes'}</p></div></div></div>
+  <section class="card"><div class="card-hd"><div class="hl"><span class="icchip t-destructive"><i data-lucide="users"></i></span><div><h2>Clientes</h2><p>${fI(lst.length)} na lista · ${S.status === 'acion' ? 'quem respondeu após o contato primeiro, contatos mais recentes antes' : 'pendentes ainda não acionados primeiro, compras mais recentes antes'}</p></div></div></div>
     <div class="tw"><table class="lst"><thead><tr><th>Cliente</th><th>Loja</th><th>Pedido</th><th>Compra</th><th class="n">Itens</th><th>Situação</th><th>Telefone</th><th></th></tr></thead><tbody>${
       pagina.map((r)=>{ const ac = acionPorPed[r.ped], np = (cliPeds[r.cli]||[]).length;
         const c = S.status === 'acion' && ac ? ac.c : (!r.dia && contatado(r));
